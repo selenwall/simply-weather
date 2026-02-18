@@ -160,6 +160,45 @@ var SMHISource = (function () {
     return days;
   }
 
+  function fetchHourly(lat, lon) {
+    return fetchData(lat, lon).then(function (data) {
+      var ts = data.timeSeries;
+      var hours = [];
+      var now = new Date();
+      var cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() + 3);
+
+      ts.forEach(function (entry) {
+        var entryTime = new Date(entry.validTime);
+        if (entryTime > cutoff) return;
+
+        var params = entry.parameters;
+        var temp = getParam(params, 't');
+        var ws = getParam(params, 'ws');
+        var wd = getParam(params, 'wd');
+        var rh = getParam(params, 'r');
+        var wsymb = getParam(params, 'Wsymb2');
+        var pmean = getParam(params, 'pmean');
+        var decoded = decodeSymbol(wsymb);
+
+        hours.push({
+          time: entry.validTime.slice(0, 16),
+          temp: temp != null ? Math.round(temp) : null,
+          feelsLike: null,
+          humidity: rh != null ? Math.round(rh) : null,
+          description: decoded.desc,
+          icon: decoded.icon,
+          precipChance: null,
+          precipAmount: pmean,
+          windSpeed: ws != null ? Math.round(ws * 3.6) : null,
+          windDir: wd != null ? Math.round(wd) : null,
+          unit: '\u00B0C'
+        });
+      });
+      return hours;
+    });
+  }
+
   function getInfoBanner() {
     return 'SMHI provides approximately 10 days of forecast data. Coverage is limited to Scandinavia and Northern Europe.';
   }
@@ -170,6 +209,7 @@ var SMHISource = (function () {
     fetchCurrent: fetchCurrent,
     fetchFiveDay: fetchFiveDay,
     fetchThirtyDay: fetchThirtyDay,
+    fetchHourly: fetchHourly,
     getInfoBanner: getInfoBanner
   };
 })();

@@ -193,6 +193,38 @@ var OpenMeteoSource = (function () {
       });
   }
 
+  function fetchHourly(lat, lon) {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat +
+      '&longitude=' + lon +
+      '&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability,precipitation' +
+      '&timezone=auto&forecast_days=3';
+
+    return fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) throw new Error(data.reason || 'Open-Meteo API error');
+        var h = data.hourly;
+        var hours = [];
+        for (var i = 0; i < h.time.length; i++) {
+          var wmo = decodeWMO(h.weather_code[i]);
+          hours.push({
+            time: h.time[i],
+            temp: Math.round(h.temperature_2m[i]),
+            feelsLike: h.apparent_temperature ? Math.round(h.apparent_temperature[i]) : null,
+            humidity: h.relative_humidity_2m ? h.relative_humidity_2m[i] : null,
+            description: wmo.desc,
+            icon: wmo.icon,
+            precipChance: h.precipitation_probability ? h.precipitation_probability[i] : null,
+            precipAmount: h.precipitation ? h.precipitation[i] : null,
+            windSpeed: h.wind_speed_10m ? Math.round(h.wind_speed_10m[i]) : null,
+            windDir: h.wind_direction_10m ? h.wind_direction_10m[i] : null,
+            unit: '\u00B0C'
+          });
+        }
+        return hours;
+      });
+  }
+
   function getInfoBanner() {
     return 'First 16 days are forecasted. Days 17\u201330 use last year\u2019s historical data as estimates.';
   }
@@ -203,6 +235,7 @@ var OpenMeteoSource = (function () {
     fetchCurrent: fetchCurrent,
     fetchFiveDay: fetchFiveDay,
     fetchThirtyDay: fetchThirtyDay,
+    fetchHourly: fetchHourly,
     getInfoBanner: getInfoBanner
   };
 })();

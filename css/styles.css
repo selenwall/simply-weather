@@ -442,6 +442,100 @@ body {
   color: var(--color-warning);
 }
 
+/* ===== Approximate Marker ===== */
+.approx-marker {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  vertical-align: super;
+  margin-left: 1px;
+}
+
+/* ===== Hourly View ===== */
+.hourly-day {
+  margin-bottom: 24px;
+}
+
+.hourly-day__header {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.hourly-table {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.hourly-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.hourly-row:last-child {
+  border-bottom: none;
+}
+
+.hourly-row:hover {
+  background: var(--color-surface-hover);
+}
+
+.hourly-row__time {
+  font-weight: 600;
+  min-width: 44px;
+  color: var(--color-text-muted);
+}
+
+.hourly-row__icon {
+  font-size: 1.2rem;
+  min-width: 28px;
+  text-align: center;
+}
+
+.hourly-row__temp {
+  font-weight: 700;
+  min-width: 40px;
+}
+
+.hourly-row__feels {
+  min-width: 40px;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.hourly-row__desc {
+  flex: 1;
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hourly-row__wind {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  min-width: 80px;
+  text-align: right;
+}
+
+.hourly-row__precip {
+  font-size: 0.8rem;
+  color: var(--color-primary);
+  min-width: 56px;
+  text-align: right;
+}
+
 /* ===== Compact Grid (30-day) ===== */
 .forecast-grid--compact {
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -518,5 +612,23 @@ body {
 
   .forecast-grid--compact {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+
+  .hourly-row {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    gap: 6px;
+  }
+
+  .hourly-row__wind {
+    display: none;
+  }
+
+  .hourly-row__feels {
+    display: none;
+  }
+
+  .hourly-row__desc {
+    font-size: 0.75rem;
   }
 }

@@ -13,14 +13,14 @@
     'smhi': SMHISource
   };
 
+  // Original option labels (without "best approx" suffix)
+  var sourceLabels = {};
+
   // ===== Source Coverage Definitions =====
-  // Each source has a coverage check: returns true if the source likely has data for the location
   var sourceCoverage = {
-    'open-meteo': function () { return true; }, // Global
-    'met-norway': function () { return true; }, // Global
+    'open-meteo': function () { return true; },
+    'met-norway': function () { return true; },
     'nws': function (lat, lon) {
-      // Continental US, Alaska, Hawaii, Puerto Rico, Guam, etc.
-      // Rough bounding boxes for US territories
       var continental = lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66;
       var alaska = lat >= 51 && lat <= 72 && lon >= -180 && lon <= -130;
       var hawaii = lat >= 18 && lat <= 23 && lon >= -161 && lon <= -154;
@@ -28,32 +28,41 @@
       return continental || alaska || hawaii || puertoRico;
     },
     'smhi': function (lat, lon) {
-      // Scandinavia and Northern Europe (SMHI's approximate coverage)
       return lat >= 52 && lat <= 72 && lon >= 2 && lon <= 32;
     }
   };
 
   // ===== Best Source Selection =====
-  // Picks the most accurate/specialized source for a given location
   function selectBestSource(lat, lon) {
-    // Sweden — SMHI is the national service
-    if (lat >= 55 && lat <= 70 && lon >= 10 && lon <= 25) {
-      return 'smhi';
-    }
-    // Norway — MET Norway is the national service
-    if (lat >= 57 && lat <= 72 && lon >= 4 && lon <= 32) {
-      return 'met-norway';
-    }
-    // US territories — NWS is the national service
-    if (sourceCoverage['nws'](lat, lon)) {
-      return 'nws';
-    }
-    // Scandinavia region not covered above — SMHI
-    if (sourceCoverage['smhi'](lat, lon)) {
-      return 'smhi';
-    }
-    // Default global fallback
+    if (lat >= 55 && lat <= 70 && lon >= 10 && lon <= 25) return 'smhi';
+    if (lat >= 57 && lat <= 72 && lon >= 4 && lon <= 32) return 'met-norway';
+    if (sourceCoverage['nws'](lat, lon)) return 'nws';
+    if (sourceCoverage['smhi'](lat, lon)) return 'smhi';
     return 'open-meteo';
+  }
+
+  // ===== Feels-Like Approximation =====
+  // Wind chill (Celsius, km/h): valid when T < 10 and V > 4.8
+  // Heat index (Celsius, %RH): valid when T > 27 and RH > 40
+  function estimateFeelsLike(temp, windSpeed, humidity) {
+    if (temp == null) return null;
+    var ws = windSpeed != null ? windSpeed : 0;
+    var rh = humidity != null ? humidity : 50;
+
+    if (temp <= 10 && ws > 4.8) {
+      // Wind chill formula (Environment Canada)
+      var wc = 13.12 + 0.6215 * temp - 11.37 * Math.pow(ws, 0.16) + 0.3965 * temp * Math.pow(ws, 0.16);
+      return Math.round(wc);
+    }
+    if (temp >= 27 && rh >= 40) {
+      // Simplified Steadman heat index (Celsius)
+      var hi = -8.785 + 1.611 * temp + 2.339 * rh
+        - 0.1461 * temp * rh - 0.01231 * temp * temp
+        - 0.01642 * rh * rh + 0.002212 * temp * temp * rh
+        + 0.000725 * temp * rh * rh - 0.000003582 * temp * temp * rh * rh;
+      return Math.round(hi);
+    }
+    return Math.round(temp);
   }
 
   // ===== State =====
@@ -63,7 +72,7 @@
     locationName: '',
     source: 'open-meteo',
     activeView: 'current',
-    cache: {} // keyed by source+view+lat+lon
+    cache: {}
   };
 
   // ===== DOM References =====
@@ -83,8 +92,17 @@
   var views = {
     current: $('view-current'),
     'five-day': $('view-five-day'),
+    'hourly': $('view-hourly'),
     'thirty-day': $('view-thirty-day')
   };
+
+  // Store original labels on init
+  (function () {
+    var options = sourceSelect.querySelectorAll('option');
+    options.forEach(function (opt) {
+      sourceLabels[opt.value] = opt.textContent;
+    });
+  })();
 
   // ===== Theme =====
   function initTheme() {
@@ -151,6 +169,11 @@
     };
   }
 
+  function formatHour(isoTime) {
+    var d = new Date(isoTime);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
   function windDirection(deg) {
     if (deg == null) return '';
     var dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -161,6 +184,8 @@
   function updateAvailableSources(lat, lon) {
     var options = sourceSelect.querySelectorAll('option');
     var availableValues = [];
+    var best = selectBestSource(lat, lon);
+
     options.forEach(function (opt) {
       var key = opt.value;
       var check = sourceCoverage[key];
@@ -168,19 +193,24 @@
         opt.style.display = '';
         opt.disabled = false;
         availableValues.push(key);
+        // Add or remove "best approx" label
+        if (key === best) {
+          opt.textContent = sourceLabels[key] + ' \u2014 best approx';
+        } else {
+          opt.textContent = sourceLabels[key];
+        }
       } else {
         opt.style.display = 'none';
         opt.disabled = true;
+        opt.textContent = sourceLabels[key];
       }
     });
 
     // Auto-select best source
-    var best = selectBestSource(lat, lon);
     if (availableValues.indexOf(best) !== -1) {
       state.source = best;
       sourceSelect.value = best;
     } else if (availableValues.indexOf(state.source) === -1) {
-      // Current source is unavailable, pick first available
       state.source = availableValues[0] || 'open-meteo';
       sourceSelect.value = state.source;
     }
@@ -207,7 +237,7 @@
           loadWeather();
         });
       },
-      function (err) {
+      function () {
         hideLoading();
         showError('Location access denied. Please search for a city or enter coordinates.');
       },
@@ -242,7 +272,6 @@
   function searchLocation(query) {
     if (!query.trim()) return;
 
-    // Check if input is coordinates (lat, lon)
     var coordMatch = query.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
     if (coordMatch) {
       state.lat = parseFloat(coordMatch[1]);
@@ -257,7 +286,6 @@
       return;
     }
 
-    // Geocode city name using Open-Meteo geocoding API (free, no key)
     showLoading();
     var url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=1&language=en';
     fetch(url)
@@ -286,10 +314,22 @@
 
   // ===== Rendering =====
   function renderCurrent(data) {
+    // Approximate missing feels-like
+    var feelsLike = data.feelsLike;
+    var feelsApprox = false;
+    if (feelsLike == null && data.temp != null) {
+      feelsLike = estimateFeelsLike(data.temp, data.windSpeed, data.humidity);
+      feelsApprox = true;
+    }
+
     $('current-icon').textContent = data.icon;
     $('current-temp').textContent = (data.temp != null ? data.temp + data.unit : '--');
     $('current-desc').textContent = data.description;
-    $('current-feels').textContent = data.feelsLike != null ? data.feelsLike + data.unit : '--';
+    if (feelsLike != null) {
+      $('current-feels').innerHTML = feelsLike + data.unit + (feelsApprox ? ' <span class="approx-marker">~</span>' : '');
+    } else {
+      $('current-feels').textContent = '--';
+    }
     $('current-humidity').textContent = data.humidity != null ? data.humidity + '%' : '--';
     $('current-wind').textContent = data.windSpeed != null ?
       data.windSpeed + ' km/h ' + windDirection(data.windDir) : '--';
@@ -328,6 +368,78 @@
     });
   }
 
+  function renderHourly(hours) {
+    var container = $('hourly-grid');
+    container.innerHTML = '';
+
+    // Group hours by date
+    var dayGroups = {};
+    var dayOrder = [];
+    hours.forEach(function (h) {
+      var dateStr = h.time.slice(0, 10);
+      if (!dayGroups[dateStr]) {
+        dayGroups[dateStr] = [];
+        dayOrder.push(dateStr);
+      }
+      dayGroups[dateStr].push(h);
+    });
+
+    dayOrder.forEach(function (dateStr) {
+      var f = formatDate(dateStr);
+      var daySection = document.createElement('div');
+      daySection.className = 'hourly-day';
+
+      var header = document.createElement('h3');
+      header.className = 'hourly-day__header';
+      header.textContent = f.day + ', ' + f.date;
+      daySection.appendChild(header);
+
+      var table = document.createElement('div');
+      table.className = 'hourly-table';
+
+      dayGroups[dateStr].forEach(function (h) {
+        var feelsLike = h.feelsLike;
+        var feelsApprox = false;
+        if (feelsLike == null && h.temp != null) {
+          feelsLike = estimateFeelsLike(h.temp, h.windSpeed, h.humidity);
+          feelsApprox = true;
+        }
+
+        var precipHtml = '';
+        if (h.precipChance != null) {
+          precipHtml = '<span class="hourly-row__precip">\uD83D\uDCA7 ' + h.precipChance + '%</span>';
+        } else if (h.precipAmount != null && h.precipAmount > 0) {
+          precipHtml = '<span class="hourly-row__precip">\uD83D\uDCA7 ' + (Math.round(h.precipAmount * 10) / 10) + 'mm</span>';
+        }
+
+        var windHtml = '';
+        if (h.windSpeed != null) {
+          windHtml = h.windSpeed + ' km/h' + (h.windDir != null ? ' ' + windDirection(h.windDir) : '');
+        }
+
+        var feelsHtml = '';
+        if (feelsLike != null) {
+          feelsHtml = feelsLike + '\u00B0' + (feelsApprox ? '<span class="approx-marker">~</span>' : '');
+        }
+
+        var row = document.createElement('div');
+        row.className = 'hourly-row';
+        row.innerHTML =
+          '<span class="hourly-row__time">' + formatHour(h.time) + '</span>' +
+          '<span class="hourly-row__icon">' + h.icon + '</span>' +
+          '<span class="hourly-row__temp">' + (h.temp != null ? h.temp + '\u00B0' : '--') + '</span>' +
+          '<span class="hourly-row__feels">' + feelsHtml + '</span>' +
+          '<span class="hourly-row__desc">' + h.description + '</span>' +
+          '<span class="hourly-row__wind">' + windHtml + '</span>' +
+          precipHtml;
+        table.appendChild(row);
+      });
+
+      daySection.appendChild(table);
+      container.appendChild(daySection);
+    });
+  }
+
   // ===== Data Loading =====
   function loadWeather() {
     if (state.lat == null || state.lon == null) {
@@ -347,7 +459,6 @@
     var view = state.activeView;
     var key = cacheKey(state.source, view, state.lat, state.lon);
 
-    // Check cache
     if (state.cache[key]) {
       hideLoading();
       renderView(view, state.cache[key]);
@@ -359,6 +470,8 @@
       promise = src.fetchCurrent(state.lat, state.lon);
     } else if (view === 'five-day') {
       promise = src.fetchFiveDay(state.lat, state.lon);
+    } else if (view === 'hourly') {
+      promise = src.fetchHourly(state.lat, state.lon);
     } else if (view === 'thirty-day') {
       promise = src.fetchThirtyDay(state.lat, state.lon);
     }
@@ -381,6 +494,9 @@
     } else if (view === 'five-day') {
       renderForecast('five-day-grid', data);
       showView('five-day');
+    } else if (view === 'hourly') {
+      renderHourly(data);
+      showView('hourly');
     } else if (view === 'thirty-day') {
       var banner = sources[state.source].getInfoBanner();
       var bannerEl = $('thirty-day-info');
@@ -443,7 +559,6 @@
 
   // ===== Initialize =====
   initTheme();
-  // Auto-detect location on load
   geolocate();
 
 })();

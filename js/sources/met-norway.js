@@ -173,6 +173,42 @@ var MetNorwaySource = (function () {
     return days;
   }
 
+  function fetchHourly(lat, lon) {
+    return fetchData(lat, lon).then(function (data) {
+      var ts = data.properties.timeseries;
+      var hours = [];
+      var now = new Date();
+      var cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() + 3);
+
+      ts.forEach(function (entry) {
+        var entryTime = new Date(entry.time);
+        if (entryTime > cutoff) return;
+
+        var instant = entry.data.instant.details;
+        var next1h = entry.data.next_1_hours || entry.data.next_6_hours || {};
+        var symbol = next1h.summary ? next1h.summary.symbol_code : null;
+        var decoded = decodeSymbol(symbol);
+        var precipAmt = next1h.details ? (next1h.details.precipitation_amount || null) : null;
+
+        hours.push({
+          time: entry.time.slice(0, 16),
+          temp: Math.round(instant.air_temperature),
+          feelsLike: null,
+          humidity: instant.relative_humidity ? Math.round(instant.relative_humidity) : null,
+          description: decoded.desc,
+          icon: decoded.icon,
+          precipChance: null,
+          precipAmount: precipAmt,
+          windSpeed: instant.wind_speed ? Math.round(instant.wind_speed * 3.6) : null,
+          windDir: instant.wind_from_direction ? Math.round(instant.wind_from_direction) : null,
+          unit: '\u00B0C'
+        });
+      });
+      return hours;
+    });
+  }
+
   function getInfoBanner() {
     return 'MET Norway provides approximately 10 days of forecast data. Days beyond that range are not available from this source.';
   }
@@ -183,6 +219,7 @@ var MetNorwaySource = (function () {
     fetchCurrent: fetchCurrent,
     fetchFiveDay: fetchFiveDay,
     fetchThirtyDay: fetchThirtyDay,
+    fetchHourly: fetchHourly,
     getInfoBanner: getInfoBanner
   };
 })();

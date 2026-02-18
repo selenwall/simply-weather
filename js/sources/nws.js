@@ -185,6 +185,49 @@ var NWSSource = (function () {
     return days;
   }
 
+  function fetchHourly(lat, lon) {
+    return getGridPoint(lat, lon).then(function (point) {
+      var forecastUrl = point.properties.forecastHourly;
+      return fetch(forecastUrl, { headers: HEADERS })
+        .then(function (r) { return r.json(); })
+        .then(function (forecast) {
+          var periods = forecast.properties.periods;
+          var hours = [];
+          var now = new Date();
+          var cutoff = new Date(now);
+          cutoff.setDate(cutoff.getDate() + 3);
+
+          periods.forEach(function (p) {
+            var pTime = new Date(p.startTime);
+            if (pTime > cutoff) return;
+
+            var tempC = p.temperatureUnit === 'F' ? fToC(p.temperature) : p.temperature;
+            var decoded = decodeIcon(p.icon);
+            var windVal = null;
+            if (p.windSpeed) {
+              var windMatch = p.windSpeed.match(/(\d+)/);
+              if (windMatch) windVal = Math.round(parseInt(windMatch[1]) * 1.609);
+            }
+
+            hours.push({
+              time: p.startTime.slice(0, 16),
+              temp: tempC,
+              feelsLike: null,
+              humidity: p.relativeHumidity ? p.relativeHumidity.value : null,
+              description: p.shortForecast || decoded.desc,
+              icon: decoded.icon,
+              precipChance: p.probabilityOfPrecipitation ? p.probabilityOfPrecipitation.value : null,
+              precipAmount: null,
+              windSpeed: windVal,
+              windDir: null,
+              unit: '\u00B0C'
+            });
+          });
+          return hours;
+        });
+    });
+  }
+
   function getInfoBanner() {
     return 'NWS provides up to 7 days of forecast data and only covers US locations.';
   }
@@ -195,6 +238,7 @@ var NWSSource = (function () {
     fetchCurrent: fetchCurrent,
     fetchFiveDay: fetchFiveDay,
     fetchThirtyDay: fetchThirtyDay,
+    fetchHourly: fetchHourly,
     getInfoBanner: getInfoBanner
   };
 })();
