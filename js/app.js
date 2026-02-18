@@ -93,7 +93,7 @@
     current: $('view-current'),
     'five-day': $('view-five-day'),
     'hourly': $('view-hourly'),
-    'compare': $('view-compare'),
+
     'thirty-day': $('view-thirty-day')
   };
 
@@ -441,69 +441,6 @@
     });
   }
 
-  // ===== Compare: fetch from all available sources =====
-  function getAvailableSources() {
-    var avail = [];
-    Object.keys(sources).forEach(function (key) {
-      var check = sourceCoverage[key];
-      if (check && check(state.lat, state.lon)) {
-        avail.push(key);
-      }
-    });
-    return avail;
-  }
-
-  function loadCompare() {
-    if (state.lat == null || state.lon == null) {
-      showError('Please select a location first.');
-      return;
-    }
-    var compKey = 'compare:' + state.lat.toFixed(2) + ':' + state.lon.toFixed(2);
-    if (state.cache[compKey]) {
-      hideLoading();
-      renderCompareDaily(state.cache[compKey]);
-      return;
-    }
-
-    showLoading();
-    var avail = getAvailableSources();
-    var promises = avail.map(function (key) {
-      var src = sources[key];
-      return Promise.all([
-        src.fetchFiveDay(state.lat, state.lon).catch(function () { return []; }),
-        src.fetchHourly(state.lat, state.lon).catch(function () { return []; })
-      ]).then(function (results) {
-        return { key: key, name: src.name, daily: results[0], hourly: results[1] };
-      });
-    });
-
-    Promise.all(promises)
-      .then(function (compareData) {
-        state.cache[compKey] = compareData;
-        hideLoading();
-        renderCompareDaily(compareData);
-      })
-      .catch(function (err) {
-        showError(err.message || 'Failed to fetch comparison data.');
-      });
-  }
-
-  function renderCompareDaily(compareData) {
-    showView('compare');
-    var container = $('compare-container');
-    CompareChart.renderDaily(container, compareData, function (dateStr) {
-      renderCompareHourly(compareData, dateStr);
-    });
-  }
-
-  function renderCompareHourly(compareData, dateStr) {
-    showView('compare');
-    var container = $('compare-container');
-    CompareChart.renderHourly(container, compareData, dateStr, function () {
-      renderCompareDaily(compareData);
-    });
-  }
-
   // ===== Data Loading =====
   function loadWeather() {
     if (state.lat == null || state.lon == null) {
@@ -511,10 +448,6 @@
       return;
     }
 
-    if (state.activeView === 'compare') {
-      loadCompare();
-      return;
-    }
 
     var src = sources[state.source];
     if (!src) {
@@ -566,9 +499,6 @@
     } else if (view === 'hourly') {
       renderHourly(data);
       showView('hourly');
-    } else if (view === 'compare') {
-      // Handled by loadCompare/renderCompareDaily directly
-      showView('compare');
     } else if (view === 'thirty-day') {
       var banner = sources[state.source].getInfoBanner();
       var bannerEl = $('thirty-day-info');
