@@ -489,19 +489,19 @@
   }
 
   function renderCompareDaily(compareData) {
+    showView('compare');
     var container = $('compare-container');
     CompareChart.renderDaily(container, compareData, function (dateStr) {
       renderCompareHourly(compareData, dateStr);
     });
-    showView('compare');
   }
 
   function renderCompareHourly(compareData, dateStr) {
+    showView('compare');
     var container = $('compare-container');
     CompareChart.renderHourly(container, compareData, dateStr, function () {
       renderCompareDaily(compareData);
     });
-    showView('compare');
   }
 
   // ===== Data Loading =====
