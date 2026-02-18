@@ -6,6 +6,25 @@
 }
 
 :root {
+  --color-bg: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-surface-hover: #e2e8f0;
+  --color-border: #cbd5e1;
+  --color-primary: #0284c7;
+  --color-primary-hover: #0369a1;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-error: #dc2626;
+  --color-warning: #d97706;
+  --color-success: #16a34a;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+[data-theme="dark"] {
   --color-bg: #0f172a;
   --color-surface: #1e293b;
   --color-surface-hover: #334155;
@@ -17,10 +36,8 @@
   --color-error: #f87171;
   --color-warning: #fbbf24;
   --color-success: #4ade80;
-  --radius: 8px;
-  --radius-lg: 12px;
   --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.3);
 }
 
 body {
@@ -29,6 +46,7 @@ body {
   color: var(--color-text);
   min-height: 100vh;
   line-height: 1.5;
+  transition: background 0.3s, color 0.3s;
 }
 
 /* ===== App Layout ===== */
@@ -46,11 +64,17 @@ body {
   margin-bottom: 16px;
 }
 
+.header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
 .header__title {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-primary);
-  margin-bottom: 12px;
 }
 
 .header__controls {
@@ -81,6 +105,42 @@ body {
   color: var(--color-text-muted);
 }
 
+/* ===== Theme Toggle ===== */
+.theme-toggle {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: background 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+.theme-toggle__icon--light {
+  display: inline;
+}
+
+.theme-toggle__icon--dark {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle__icon--light {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle__icon--dark {
+  display: inline;
+}
+
 /* ===== Common Controls ===== */
 .btn {
   border: none;
@@ -95,7 +155,11 @@ body {
 
 .btn--primary {
   background: var(--color-primary);
-  color: var(--color-bg);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .btn--primary {
+  color: #0f172a;
 }
 
 .btn--primary:hover {
@@ -149,6 +213,7 @@ body {
   border-radius: var(--radius-lg);
   padding: 4px;
   margin-bottom: 16px;
+  box-shadow: var(--shadow);
 }
 
 .tab {
@@ -170,7 +235,11 @@ body {
 
 .tab--active {
   background: var(--color-primary);
-  color: var(--color-bg);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .tab--active {
+  color: #0f172a;
 }
 
 /* ===== Main Content ===== */
@@ -222,7 +291,7 @@ body {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   padding: 32px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
 }
 
 .current-weather__main {
@@ -315,11 +384,12 @@ body {
   padding: 16px;
   text-align: center;
   box-shadow: var(--shadow);
-  transition: transform 0.15s;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .forecast-card:hover {
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .forecast-card__day {
@@ -365,6 +435,11 @@ body {
   font-size: 0.7rem;
   color: var(--color-primary);
   margin-top: 4px;
+}
+
+.estimate-label {
+  font-size: 0.65rem;
+  color: var(--color-warning);
 }
 
 /* ===== Compact Grid (30-day) ===== */

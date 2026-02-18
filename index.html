@@ -9,7 +9,13 @@
 <body>
   <div class="app">
     <header class="header">
-      <h1 class="header__title">Simply Weather</h1>
+      <div class="header__top">
+        <h1 class="header__title">Simply Weather</h1>
+        <button id="theme-toggle" class="theme-toggle" title="Toggle night mode" aria-label="Toggle night mode" aria-checked="false" role="switch">
+          <span class="theme-toggle__icon--light">&#9790;</span>
+          <span class="theme-toggle__icon--dark">&#9788;</span>
+        </button>
+      </div>
       <div class="header__controls">
         <div class="location-bar">
           <button id="geolocate-btn" class="btn btn--icon" title="Use my location">
@@ -22,11 +28,12 @@
           <button id="search-btn" class="btn btn--primary">Search</button>
         </div>
         <div class="source-selector">
-          <label for="data-source">Data Source:</label>
+          <label for="data-source">Source:</label>
           <select id="data-source" class="select">
             <option value="open-meteo">Open-Meteo (Global)</option>
             <option value="met-norway">MET Norway / Yr (Global)</option>
             <option value="nws">NWS (US Only)</option>
+            <option value="smhi">SMHI (Scandinavia)</option>
           </select>
         </div>
       </div>
@@ -116,6 +123,7 @@
   <script src="js/sources/open-meteo.js"></script>
   <script src="js/sources/met-norway.js"></script>
   <script src="js/sources/nws.js"></script>
+  <script src="js/sources/smhi.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

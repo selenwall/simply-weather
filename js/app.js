@@ -9,8 +9,52 @@
   var sources = {
     'open-meteo': OpenMeteoSource,
     'met-norway': MetNorwaySource,
-    'nws': NWSSource
+    'nws': NWSSource,
+    'smhi': SMHISource
   };
+
+  // ===== Source Coverage Definitions =====
+  // Each source has a coverage check: returns true if the source likely has data for the location
+  var sourceCoverage = {
+    'open-meteo': function () { return true; }, // Global
+    'met-norway': function () { return true; }, // Global
+    'nws': function (lat, lon) {
+      // Continental US, Alaska, Hawaii, Puerto Rico, Guam, etc.
+      // Rough bounding boxes for US territories
+      var continental = lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66;
+      var alaska = lat >= 51 && lat <= 72 && lon >= -180 && lon <= -130;
+      var hawaii = lat >= 18 && lat <= 23 && lon >= -161 && lon <= -154;
+      var puertoRico = lat >= 17 && lat <= 19 && lon >= -68 && lon <= -65;
+      return continental || alaska || hawaii || puertoRico;
+    },
+    'smhi': function (lat, lon) {
+      // Scandinavia and Northern Europe (SMHI's approximate coverage)
+      return lat >= 52 && lat <= 72 && lon >= 2 && lon <= 32;
+    }
+  };
+
+  // ===== Best Source Selection =====
+  // Picks the most accurate/specialized source for a given location
+  function selectBestSource(lat, lon) {
+    // Sweden — SMHI is the national service
+    if (lat >= 55 && lat <= 70 && lon >= 10 && lon <= 25) {
+      return 'smhi';
+    }
+    // Norway — MET Norway is the national service
+    if (lat >= 57 && lat <= 72 && lon >= 4 && lon <= 32) {
+      return 'met-norway';
+    }
+    // US territories — NWS is the national service
+    if (sourceCoverage['nws'](lat, lon)) {
+      return 'nws';
+    }
+    // Scandinavia region not covered above — SMHI
+    if (sourceCoverage['smhi'](lat, lon)) {
+      return 'smhi';
+    }
+    // Default global fallback
+    return 'open-meteo';
+  }
 
   // ===== State =====
   var state = {
@@ -34,12 +78,35 @@
   var errorMsg = $('error-message');
   var retryBtn = $('retry-btn');
   var attribution = $('source-attribution');
+  var themeToggle = $('theme-toggle');
   var tabs = document.querySelectorAll('.tab');
   var views = {
     current: $('view-current'),
     'five-day': $('view-five-day'),
     'thirty-day': $('view-thirty-day')
   };
+
+  // ===== Theme =====
+  function initTheme() {
+    var saved = localStorage.getItem('simply-weather-theme');
+    if (saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      themeToggle.setAttribute('aria-checked', 'true');
+    }
+  }
+
+  function toggleTheme() {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('simply-weather-theme', 'light');
+      themeToggle.setAttribute('aria-checked', 'false');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('simply-weather-theme', 'dark');
+      themeToggle.setAttribute('aria-checked', 'true');
+    }
+  }
 
   // ===== Helpers =====
   function show(el) { el.classList.remove('hidden'); }
@@ -90,6 +157,36 @@
     return dirs[Math.round(deg / 45) % 8];
   }
 
+  // ===== Source Availability =====
+  function updateAvailableSources(lat, lon) {
+    var options = sourceSelect.querySelectorAll('option');
+    var availableValues = [];
+    options.forEach(function (opt) {
+      var key = opt.value;
+      var check = sourceCoverage[key];
+      if (check && check(lat, lon)) {
+        opt.style.display = '';
+        opt.disabled = false;
+        availableValues.push(key);
+      } else {
+        opt.style.display = 'none';
+        opt.disabled = true;
+      }
+    });
+
+    // Auto-select best source
+    var best = selectBestSource(lat, lon);
+    if (availableValues.indexOf(best) !== -1) {
+      state.source = best;
+      sourceSelect.value = best;
+    } else if (availableValues.indexOf(state.source) === -1) {
+      // Current source is unavailable, pick first available
+      state.source = availableValues[0] || 'open-meteo';
+      sourceSelect.value = state.source;
+    }
+    attribution.textContent = sources[state.source].attribution;
+  }
+
   // ===== Geolocation =====
   function geolocate() {
     if (!navigator.geolocation) {
@@ -105,6 +202,8 @@
           state.locationName = name;
           locationDisplay.textContent = name + ' (' + state.lat.toFixed(2) + ', ' + state.lon.toFixed(2) + ')';
           locationInput.value = name;
+          state.cache = {};
+          updateAvailableSources(state.lat, state.lon);
           loadWeather();
         });
       },
@@ -117,8 +216,6 @@
   }
 
   function reverseGeocode(lat, lon) {
-    var url = 'https://geocoding-api.open-meteo.com/v1/search?name=_&count=1&latitude=' + lat + '&longitude=' + lon;
-    // Use Open-Meteo reverse geocoding
     var reverseUrl = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon + '&zoom=10';
     return fetch(reverseUrl, {
       headers: { 'User-Agent': 'SimplyWeather/1.0' }
@@ -150,9 +247,11 @@
     if (coordMatch) {
       state.lat = parseFloat(coordMatch[1]);
       state.lon = parseFloat(coordMatch[2]);
+      state.cache = {};
       reverseGeocode(state.lat, state.lon).then(function (name) {
         state.locationName = name;
         locationDisplay.textContent = name + ' (' + state.lat.toFixed(2) + ', ' + state.lon.toFixed(2) + ')';
+        updateAvailableSources(state.lat, state.lon);
         loadWeather();
       });
       return;
@@ -176,6 +275,8 @@
         if (loc.country) parts.push(loc.country);
         state.locationName = parts.join(', ');
         locationDisplay.textContent = state.locationName + ' (' + state.lat.toFixed(2) + ', ' + state.lon.toFixed(2) + ')';
+        state.cache = {};
+        updateAvailableSources(state.lat, state.lon);
         loadWeather();
       })
       .catch(function (err) {
@@ -212,7 +313,7 @@
       } else if (day.precipAmount != null && day.precipAmount > 0) {
         precipHtml = '<div class="forecast-card__precip">\uD83D\uDCA7 ' + day.precipAmount + ' mm</div>';
       }
-      var estimateLabel = day.isEstimate ? ' <span style="font-size:0.65rem;color:#fbbf24;">(est.)</span>' : '';
+      var estimateLabel = day.isEstimate ? ' <span class="estimate-label">(est.)</span>' : '';
       card.innerHTML =
         '<div class="forecast-card__day">' + f.day + estimateLabel + '</div>' +
         '<div class="forecast-card__date">' + f.date + '</div>' +
@@ -336,7 +437,12 @@
     loadWeather();
   });
 
+  themeToggle.addEventListener('click', function () {
+    toggleTheme();
+  });
+
   // ===== Initialize =====
+  initTheme();
   // Auto-detect location on load
   geolocate();
 
